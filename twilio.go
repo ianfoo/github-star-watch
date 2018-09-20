@@ -59,6 +59,10 @@ func NewTwilioSMSSender(
 	return ts, nil
 }
 
+// WithTwilioLogger is an option that can be passed to NewTwilioSMSSender to
+// set the *zap.SugaredLogger that the TwilioSMSSender will use internally.  If
+// this option is not passed to NewTwilioSMSSender, a no-op log will be used
+// internally.
 func WithTwilioLogger(logger *zap.SugaredLogger) func(*TwilioSMSSender) {
 	return func(sg *TwilioSMSSender) {
 		sg.log = logger

@@ -36,7 +36,7 @@ type GitHubStargazer struct {
 	log        *zap.SugaredLogger
 }
 
-// New GitHubStargazer returns a new gazer to watch the number of subscribers a
+// NewGitHubStargazer returns a new gazer to watch the number of subscribers a
 // GitHub repo has, and execute hook when target is crossed.
 func NewGitHubStargazer(
 	repo string,
@@ -67,10 +67,17 @@ func NewGitHubStargazer(
 	return sg, nil
 }
 
+// SetHook allows the caller to set the threshold-crossed function hook
+// after the GitHubStargazer has been instantiated, in case the function
+// needs a reference to it.
 func (sg *GitHubStargazer) SetHook(hook func() error) {
 	sg.ThresholdCrossedHook = hook
 }
 
+// WithGitHubLogger is an option that can be passed to NewGitHubStargazer to
+// set the *zap.SugaredLogger that the GitHubStargazer will use internally.  If
+// this option is not passed to NewGitHubStargazer, a no-op log will be used
+// internally.
 func WithGitHubLogger(logger *zap.SugaredLogger) func(*GitHubStargazer) {
 	return func(sg *GitHubStargazer) {
 		sg.log = logger
