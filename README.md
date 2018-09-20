@@ -50,11 +50,21 @@ really cross with you.
 
 ## Complaints and how this could be much better
 
-### There are no tests and you have log statements all over the place!
+### There are no tests!
 
-I know, I know. This isn't production quality code. Maybe this will become more
-generally useful at some point, but at this point it was just a diversion and
-an excuse to poke around Twilio and GitHub's APIs. It could be improved in many
+I know, I know. This isn't production quality code, and I don't actually
+recommend you (or I) write code in this fashion. Tests should be developed at
+least in step with the base functionality. It promotes writing simpler, more
+testable code, especially if you write the tests first. I dove in head first,
+and I'm sorry. In having performed a bit of refactoring, I can tell you that
+it would have been a little easier to get things back to a working state if
+I'd had tests to run. I was going to write tests as part of this refactor,
+but it's getting really late and it's only Wednesday. Well, Thursday morning
+now.
+
+In any case, maybe this will become more generally useful at some point, and
+have thousands of stars, but at this point it was just a diversion and an
+excuse to poke around Twilio and GitHub's APIs.  It could be improved in many
 ways, some of which I am aware of right now, and others I'm sure I would never
 think of.
 
@@ -63,11 +73,12 @@ think of.
 * Some testing.
 * Give error handling some actual thought and improve the slapdash job done
   here.
-* Centralized/pluggable logging.
-* Graceful shutdown.
+* Better logging: forcing starwatcher package to use zap.SugaredLogger is too
+  specific?
 * Separate the orthogonal concerns of GitHub and Twilio interaction.
-* Support more than just stargazers.
 * Follow-up checking on Twilio message status/delivery.
+* Graceful shutdown.
 * Other message transports, e.g., FB Messenger, Twitter.
+* Support more than just stargazers.
 
 If you have other ideas and are so motivated, file issues and/or PRs!

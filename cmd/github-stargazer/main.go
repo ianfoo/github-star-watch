@@ -9,6 +9,7 @@ import (
 
 	stargazer "github.com/ianfoo/github-stargazer"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
 const (
@@ -31,7 +32,17 @@ func setup() (*stargazer.GitHubStargazer, error) {
 		target   = flag.Uint("target", 0, "Target number of stargazers")
 		phone    = flag.String("phone", "", "Phone number to send SMS to upon reaching stargazer target")
 		interval = flag.Duration("interval", time.Minute, "How often to check stargazer count")
+		sender   = flag.String("sender", "", "Twilio phone number from which to send SMS messages")
 	)
+	var log *zap.SugaredLogger
+	{
+		plainLog, err := zap.NewDevelopment()
+		if err != nil {
+			return nil, err
+		}
+		log = plainLog.Sugar()
+	}
+
 	flag.Parse()
 	if *target == 0 {
 		return nil, errors.New("target stargazers must be greater than zero")
@@ -42,33 +53,31 @@ func setup() (*stargazer.GitHubStargazer, error) {
 	if *repo == "" {
 		return nil, errors.New("repo is required")
 	}
-
-	twilio := stargazer.TwilioSMSSender{
-		AccountSID: os.Getenv(envTwilioAccountSID),
-		AuthToken:  os.Getenv(envTwilioAuthToken),
-		Sender:     os.Getenv(envTwilioPhoneNumber),
+	if *sender == "" {
+		*sender = os.Getenv(envTwilioPhoneNumber)
 	}
-	if twilio.AccountSID == "" || twilio.AuthToken == "" {
-		return nil, fmt.Errorf(
-			"set %s and %s in your environment",
-			envTwilioAccountSID, envTwilioAuthToken)
-	}
-	if twilio.Sender == "" {
-		return nil, fmt.Errorf(
-			"set %s in your environment to the number that Twilio should send from",
-			envTwilioPhoneNumber)
+	twilio, err := stargazer.NewTwilioSMSSender(os.Getenv(envTwilioAccountSID),
+		os.Getenv(envTwilioAuthToken),
+		*sender, stargazer.WithTwilioLogger(log))
+	if err != nil {
+		return nil, err
 	}
 
-	gazer := &stargazer.GitHubStargazer{
-		Repository:       *repo,
-		StargazersTarget: int(*target),
-		Interval:         *interval,
+	gazer, err := stargazer.NewGitHubStargazer(
+		*repo,
+		int(*target),
+		*interval,
+		nil,
+		stargazer.WithGitHubLogger(log))
+	if err != nil {
+		return nil, err
 	}
-	gazer.TargetHitHook = func() error {
+	hook := func() error {
 		return twilio.Send(*phone, fmt.Sprintf(
 			"Hey! GitHub repo %s has reached %d stargazers!",
 			gazer.Repository, gazer.StargazersCount()))
 	}
+	gazer.SetHook(hook)
 	return gazer, nil
 }
 
