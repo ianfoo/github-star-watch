@@ -1,0 +1,12 @@
+# Ignore named binary
+github-stargazer
+
+# But not the cmd/github-stargazer directory!
+!cmd/*
+
+# Other junk
+*.bak
+*.swp
+*~
+*.a
+
