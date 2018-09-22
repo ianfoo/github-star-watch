@@ -16,6 +16,7 @@ const (
 	envTwilioAccountSID  = "TWILIO_ACCOUNT_SID"
 	envTwilioAuthToken   = "TWILIO_AUTH_TOKEN"
 	envTwilioPhoneNumber = "TWILIO_PHONE_NUMBER"
+	envGitHubToken       = "GITHUB_TOKEN"
 )
 
 func main() {
@@ -68,14 +69,30 @@ func setup() (*stargazer.GitHubStargazer, error) {
 		int(*target),
 		*interval,
 		nil,
-		stargazer.WithGitHubLogger(log))
+		stargazer.WithGitHubLogger(log),
+		stargazer.WithGitHubToken(os.Getenv(envGitHubToken)))
 	if err != nil {
 		return nil, err
 	}
 	hook := func() error {
-		return twilio.Send(*phone, fmt.Sprintf(
+		err := twilio.Send(*phone, fmt.Sprintf(
 			"Hey! GitHub repo %s has reached %d stargazers!",
 			gazer.Repository, gazer.StargazersCount()))
+		if err != nil {
+			log.Warnw("unable to send SMS", "err", err)
+		}
+		if err := gazer.Star(); err != nil {
+			log.Warnw("unable to star repo", "repo", gazer.Repository, "err", err)
+			return err
+		}
+		err = twilio.Send(*phone, fmt.Sprintf(
+			"Hey! GitHub repo %s has been starred by you!",
+			gazer.Repository))
+		if err != nil {
+			log.Warnw("unable to send SMS", "err", err)
+		}
+		gazer.Stop()
+		return nil
 	}
 	gazer.SetHook(hook)
 	return gazer, nil
