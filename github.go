@@ -15,20 +15,21 @@ import (
 // stargazers and calls a function when this target is reached.
 type GitHubStargazer struct {
 	// Repository is the name of the respository to watch in owner/repo format.
-	Repository string
+	Repository string `json:"repository"`
 
 	// StargazersTarget is the number of stargazers at which the TargetHitHook
 	// should be invoked.
-	StargazersTarget int
+	StargazersTarget int `json:"stargazers_target"`
 
 	// Interval is how often the stargazer count will be checked.
-	Interval time.Duration
+	Interval time.Duration `json:"check_interval"`
 
 	// ThresholdCrossedHook gets run when the target number of stargazers is reached,
 	// or immediately if the actual number exceeds the target upon first check.
-	ThresholdCrossedHook func() error
+	ThresholdCrossedHook func() error `json:"-"`
 
 	stargazersCount int
+	ticker          *time.Ticker
 
 	apiBaseURL string
 	client     *http.Client
@@ -104,9 +105,10 @@ func (sg *GitHubStargazer) Gaze() {
 	sg.log.Infow("watching for stargazers",
 		"repo", sg.Repository,
 		"target", sg.StargazersTarget,
-		"poll_interval", sg.Interval)
+		"poll_interval", sg.Interval,
+		"have_github_token", sg.token != "")
 
-	t := time.NewTicker(sg.Interval)
+	sg.ticker = time.NewTicker(sg.Interval)
 	sg.stopCh = make(chan struct{}, 1)
 	var (
 		count int
@@ -115,7 +117,7 @@ func (sg *GitHubStargazer) Gaze() {
 	// TODO Make this run immediately and not just after the interval.
 	for {
 		select {
-		case <-t.C:
+		case <-sg.ticker.C:
 			if count, err = sg.fetchStargazersCount(); err != nil {
 				// TODO Interpret error; determine retriability.
 				// TODO Back off if too many consecutive retriable errors
@@ -141,14 +143,32 @@ func (sg *GitHubStargazer) Gaze() {
 			}
 		case <-sg.stopCh:
 			sg.log.Infow("my work here is done")
+			sg.ticker.Stop()
 			return
 		}
 	}
 }
 
+// Pause the gazing madness.
+func (sg *GitHubStargazer) Pause() {
+	if sg.ticker == nil || sg.ticker.C == nil {
+		return
+	}
+	sg.ticker.Stop()
+	sg.ticker.C = nil
+}
+
+// Unpause the gazing madness.
+func (sg *GitHubStargazer) Unpause() {
+	if sg.ticker != nil && sg.ticker.C != nil {
+		return
+	}
+	sg.ticker = time.NewTicker(sg.Interval)
+}
+
 // Stop the gazing madness.
 func (sg *GitHubStargazer) Stop() {
-	sg.stopCh <- struct{}{}
+	close(sg.stopCh)
 }
 
 // Star adds a star to the repository if a token has been set.
@@ -173,6 +193,21 @@ func (sg GitHubStargazer) Star() error {
 	}
 	sg.log.Infow("starred repository", "repo", sg.Repository)
 	return nil
+}
+
+// FetchStargazerCount fetches the current number of stargazers from GitHub,
+// and records its value, in addition to returning it.
+func (sg *GitHubStargazer) FetchStargazerCount() (int, error) {
+	var (
+		count int
+		err   error
+	)
+	if count, err = sg.fetchStargazersCount(); err != nil {
+		sg.log.Errorw("error fetching updated stargazer count after starring repo",
+			"err", err)
+	}
+	sg.updateStargazersCount(count)
+	return sg.StargazersCount(), nil
 }
 
 // StargazersCount returns the most recent number of stargazers fetched by the
